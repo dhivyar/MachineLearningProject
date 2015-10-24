@@ -1,0 +1,198 @@
+---
+title: 'Course Project: Machine Learning Coursera'
+author: "Dhivya R"
+output: html_document
+mail: dhivyaravindran@gmail.com
+---
+## GitHub Repo
+https://github.com/dhivyar/MachineLearning
+
+## Writeup
+
+Using devices such as Jawbone Up, Nike FuelBand, and Fitbit it is now possible to collect a large amount of data about personal activity relatively inexpensively. These type of devices are part of the quantified self movement - a group of enthusiasts who take measurements about themselves regularly to improve their health, to find patterns in their behavior, or because they are tech geeks. One thing that people regularly do is quantify how much of a particular activity they do, but they rarely quantify how well they do it. In this project, your goal will be to use data from accelerometers on the belt, forearm, arm, and dumbell of 6 participants. They were asked to perform barbell lifts correctly and incorrectly in 5 different ways. More information is available from the website here: http://groupware.les.inf.puc-rio.br/har (see the section on the Weight Lifting Exercise Dataset). 
+
+## Read Me
+
+1. Download the MachineLearningCoursera.Rmd, pml-training.csv and pml-testing.csv to a local directory.
+2. Open the .Rmd file in R Studio.
+3. Set the R session's working directory to that local directory.
+3. Click the "Knit HTML" button to view the HTML file with R results and plots.
+
+OR
+
+1. View the HTML file with the algorithm and results published at:
+https://github.com/dhivyar/CourseProject/blob/master/ProjectPage.md
+
+## Machine Learning Algorithm
+
+Including the required packages
+
+```{r, warning=FALSE}
+suppressPackageStartupMessages(library(caret))
+suppressPackageStartupMessages(library(ggplot2))
+suppressPackageStartupMessages(library(RANN))
+suppressPackageStartupMessages(library(corrplot))
+suppressPackageStartupMessages(library(kernlab))
+suppressPackageStartupMessages(library(e1071))
+suppressPackageStartupMessages(library(randomForest))
+```
+
+Reading the test and train data sets
+```{r}
+# Reading the data
+train <- read.csv("pml-training.csv")
+test <- read.csv("pml-testing.csv")
+```
+
+Analyzing class of the variables in the train data set
+```{r}
+table(sapply(train,class))
+class(train$classe)
+```
+
+Since the variable to be predicted is of class "factor". We will try to see if it is a factor with levels 
+or without levels.
+
+```{r}
+table(train$classe)
+```
+
+This factor variable classe has 5 levels: A, B, C, D and E. Linear support vector machines or random forests should work well for building a machine learning algorithm to predict a categorical variable with labels and < 100k samples.
+
+Next its vital that we change all factor variables into numeric ones, so that most modeling algorithms
+can train over it. So we assign dummies for each level in the factor variables and all 160 variables are
+of class numeric now.
+```{r}
+after_dummy <- lapply(train, as.numeric)
+after_dummy_test <- lapply(test,as.numeric)
+after_dummy <- as.data.frame(after_dummy)
+after_dummy_test <- as.data.frame(after_dummy_test)
+table(sapply(after_dummy,class))
+```
+Now we see that there are 160 predictors, lets see if any of them have zero variability
+```{r}
+newtrain <- nearZeroVar(after_dummy,saveMetrics=T)
+table(newtrain$nzv)
+after_nzv <- after_dummy[,newtrain$nzv==FALSE]
+after_nzv_test <- after_dummy_test[,newtrain$nzv==FALSE]
+rm(train)
+rm(test)
+after_nzv <- lapply(after_nzv, as.numeric)
+after_nzv <- as.data.frame(after_nzv)
+after_nzv_test <- lapply(after_nzv_test, as.numeric)
+after_nzv_test <- as.data.frame(after_nzv_test)
+```
+
+We see that for 60 predictors, the near zero variance is TRUE, which means these predictors have very minimal prediction capabilities. So it is okay to remove them from the data set. We are now left with 100 
+predictors
+
+Next, we perform missing value treatment for the dataset using imputational k- nearest neighbour algorithm
+```{r}
+# k nearest neighbour
+obj <- preProcess(after_nzv[,-100],method="knnImpute")
+table(is.na(after_nzv))
+table(is.na(after_nzv_test))
+
+summary <- as.data.frame(summary(after_nzv))
+missing <- predict(obj,after_nzv[,-100])
+missing.1 <- predict(obj,after_nzv_test[,-100])
+```
+
+Next we find the correlation between features and draw the correlation plot
+```{r}
+# Find correlation excluding the variable to be predicted
+M <- abs(cor(missing))
+M1 <- abs(cor(missing.1))
+# Correlation with itself is 1, so resetting that 
+diag(M) <- 0
+diag(M1) <- 0
+```
+
+Drawing the correlation plot for features with correlation > 80%
+```{r, fig.width = 20, fig.height = 20}
+corrplot(M>0.8)
+```
+
+Flagging highly correlated predictors and removing them off. We are now left with 61 predcitors.
+```{r}
+# Flagging high correlation
+highlyCorr <- findCorrelation(M, cutoff = 0.8)
+filteredCorr <- missing[,-highlyCorr]
+filteredCorr.t <- missing.1[,-highlyCorr]
+```
+
+Next, we know one of the most important pre processing to be performed is correction for skewness.
+We Center and Scale the histograms of the predictors. But we see that the predictors are already
+standardized with mean 0 and standard deviation 1, so we bypass this step.
+
+```{r}
+head(lapply(filteredCorr, function(x) mean(x)))
+head(lapply(filteredCorr, function(x) sd(x)))
+```
+
+```{r}
+filteredCorr$classe <- after_nzv$classe
+filteredCorr.t$classe <- 0
+finalTrain <- filteredCorr
+finalTest <- filteredCorr.t
+# Good practice to keep environment free of unnecessary clutter
+rm(after_dummy)
+rm(after_nzv)
+rm(missing)
+rm(M)
+rm(highlyCorr)
+rm(obj)
+rm(after_dummy_test)
+rm(after_nzv_test)
+rm(missing.1)
+rm(M1)
+set.seed(1500)
+```
+
+## Cross Validation
+
+Creating samples in the train data set. We expect the error to be around 1%. 
+```{r}
+inTrain <- createDataPartition(y=finalTrain$class,p=0.75,list=F)
+train_sample <- finalTrain[inTrain,]
+test_sample <- finalTrain[-inTrain,]
+```
+
+Using Support Vector Machine Classifier; Since we are predicting a category and this is labeled data and
+we have less than 100k samples. The summary of the model is given below and so is the confusion matrix.
+Our accuracy here is:
+
+### Support Vector Machine Classifier Accuracy: 0.9984  
+```{r}
+model_svm <- svm(as.factor(classe)~., data=train_sample)
+summary(model_svm)
+prediction <- predict(model_svm,test_sample[,-62])
+confusionMatrix(prediction,test_sample$classe)
+```
+
+Using Random Forest Classifier; Since it can predict categorical variables and can train over categorical predictors.The summary of the model is given below and so is the confusion matrix. Our accuracy here is: 
+
+### Random Forest Algorithm Accuracy : 0.9998  
+```{r}
+model_rf <- randomForest(as.factor(classe)~ ., data=train_sample,importance=TRUE,proximity=TRUE)
+print(model_rf)
+prediction_rf <- predict(model_rf,test_sample[,-62])
+confusionMatrix(prediction_rf,test_sample$classe)
+```
+
+Final predictions over the test set
+```{r}
+prediction_final_svm <- predict(model_svm, finalTest[,-62])
+prediction_final <- predict(model_rf, finalTest[,-62])
+```
+
+Variable importance plot showing the model capable predictors, which is why removing them would make the model go grossly wrong.
+```{r, fig.width = 15, fig.height = 15}
+varImpPlot(model_rf)
+```
+
+Output of the prediction anlysis
+```{r}
+answers <- chartr("12345", "ABCDE", prediction_final)
+answers
+```
