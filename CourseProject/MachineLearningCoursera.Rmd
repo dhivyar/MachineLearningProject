@@ -5,7 +5,7 @@ output: html_document
 mail: dhivyaravindran@gmail.com
 ---
 ## GitHub Repo
-https://github.com/dhivyar/MachineLearning
+https://github.com/dhivyar/MachineLearningProject
 
 ## Writeup
 
@@ -21,7 +21,7 @@ Using devices such as Jawbone Up, Nike FuelBand, and Fitbit it is now possible t
 OR
 
 1. View the HTML file with the algorithm and results published at:
-https://github.com/dhivyar/CourseProject/blob/master/ProjectPage.md
+https://github.com/dhivyar/MachineLearningProject/blob/master/CourseProject/ProjectPage.md
 
 ## Machine Learning Algorithm
 
