@@ -2,4 +2,4 @@
 ## The Project Page
 ### Compiled HTML at RPubs
 
-http://rpubs.com/dhivyar/120174
+http://rpubs.com/dhivyar/machinelearningproject
