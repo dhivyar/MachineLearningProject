@@ -9,4 +9,5 @@ Using devices such as Jawbone Up, Nike FuelBand, and Fitbit it is now possible t
 
 OR
 
-* View the HTML file with the algorithm and results published at: https://github.com/dhivyar/CourseProject/blob/master/ProjectPage.md
+* View the HTML file with the algorithm and results published at RPubs: 
+http://rpubs.com/dhivyar/machinelearningproject
